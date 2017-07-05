@@ -1329,6 +1329,7 @@ public class Job extends JobContextImpl implements JobContext {
     //------------------------
     Long mapStart=0l;
     Long mapEnd = 0l;
+    Boolean mapTimeFlag = true;
     //------------------------
 
     String lastReport = null;
@@ -1362,11 +1363,14 @@ public class Job extends JobContextImpl implements JobContext {
 
       //------------------------------------------------------------
       LOG.info("fangheart:Job.java------Map时间记录");
-      if (StringUtils.formatPercent(mapProgress(), 0).equals( "0%" )){
+      if (StringUtils.formatPercent(mapProgress(), 0).equals( "0%" ) && mapTimeFlag==true){
           mapStart= System.currentTimeMillis();
+        LOG.info("fangheart:Job.java------Map开始时间已记录");
+          mapTimeFlag = false;
       }
       if (StringUtils.formatPercent(mapProgress(), 0).equals( "100%" )){
           mapEnd= System.currentTimeMillis();
+        LOG.info("fangheart:Job.java------Map结束时间已记录");
       }
       //------------------------------------------------------------------
       String report = 
