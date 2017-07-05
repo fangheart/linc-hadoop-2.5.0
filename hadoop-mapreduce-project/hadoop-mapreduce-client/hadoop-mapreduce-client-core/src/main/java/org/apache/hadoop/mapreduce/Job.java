@@ -1326,6 +1326,11 @@ public class Job extends JobContextImpl implements JobContext {
    */
   public boolean monitorAndPrintJob() 
       throws IOException, InterruptedException {
+    //------------------------
+    Long mapStart=0l;
+    Long mapEnd = 0l;
+    //------------------------
+
     String lastReport = null;
     Job.TaskStatusFilter filter;
     Configuration clientConf = getConfiguration();
@@ -1353,7 +1358,17 @@ public class Job extends JobContextImpl implements JobContext {
       if (!reportedUberMode) {
         reportedUberMode = true;
         LOG.info("Job " + jobId + " running in uber mode : " + isUber());
-      }      
+      }
+
+      //------------------------------------------------------------
+      LOG.info("fangheart:Job.java------Map时间记录");
+      if (StringUtils.formatPercent(mapProgress(), 0).equals( "0%" )){
+          mapStart= System.currentTimeMillis();
+      }
+      if (StringUtils.formatPercent(mapProgress(), 0).equals( "100%" )){
+          mapEnd= System.currentTimeMillis();
+      }
+      //------------------------------------------------------------------
       String report = 
         (" map " + StringUtils.formatPercent(mapProgress(), 0)+
             " reduce " + 
@@ -1370,6 +1385,11 @@ public class Job extends JobContextImpl implements JobContext {
     }
     boolean success = isSuccessful();
     if (success) {
+      //-------------------------------------------------------------------------
+      LOG.info("fangheart:Map开始运行时间为：" + mapStart);
+      LOG.info("fangheart:Map结束运行时间为：" + mapEnd);
+      LOG.info("fangheart:Map整体运行时间为：" + (mapEnd-mapStart));
+      //-------------------------------------------------------------------------------
       LOG.info("Job " + jobId + " completed successfully");
     } else {
       LOG.info("Job " + jobId + " failed with state " + status.getState() + 
