@@ -94,6 +94,7 @@ import javax.net.SocketFactory;
 import com.google.common.collect.Lists;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
@@ -212,7 +213,9 @@ import com.google.common.net.InetAddresses;
 @InterfaceAudience.Private
 public class DFSClient implements java.io.Closeable, RemotePeerFactory {
   public static final Log LOG = LogFactory.getLog(DFSClient.class);
-    public static final Log LOG2 = LogFactory.getLog("Major");
+  public static final Log LOG2 = LogFactory.getLog("Major");
+  public static final Log fangLOG = LogFactory.getLog("fang");
+
   public static final long SERVER_DEFAULTS_VALIDITY_PERIOD = 60 * 60 * 1000L; // 1 hour
   static final int TCP_WINDOW_SIZE = 128 * 1024; // 128 KB
 
@@ -1318,6 +1321,8 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory {
     checkOpen();
     //    Get block info from namenode
       LOG2.info("======DFSClient:src=" + src);
+
+      //fangLOG.info("DFSClient -----test");
     return new DFSInputStream(this, src, buffersize, verifyChecksum);
   }
 

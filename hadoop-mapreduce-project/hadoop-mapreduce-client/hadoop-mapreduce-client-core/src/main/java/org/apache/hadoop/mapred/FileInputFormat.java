@@ -21,8 +21,13 @@ package org.apache.hadoop.mapred;
 import java.io.IOException;
 import java.util.*;
 
+import com.google.common.collect.Lists;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.Major.Major;
+
+
+
 import org.apache.hadoop.Major.MajorClient;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -65,6 +70,8 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
 
   public static final Log LOG =
     LogFactory.getLog(FileInputFormat.class);
+
+  public static final Log fangLOG = LogFactory.getLog("fang");
 
   //MAJOR ADD
   public String jobid = "";
@@ -391,8 +398,36 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
         splits.add(makeSplit(path, 0, length, new String[0]));
       }
     }
+
+    //fang add
+    fangLOG.info("fang--------------FileInputFormat->getsplits()->MajorClient.updateSplits");
+    for (String spid : srcs.keySet()) {
+      String s = srcs.get(spid);
+      List<String> loc = locations.get(spid);
+      HashSet<String> locset = new HashSet<String>();
+      String locstr = "";
+      for (String nodeid : loc) {
+        locset.add(nodeid);
+        locstr += loc + "|";
+      }
+      Long o = offsets.get(spid);
+      Long l = lengths.get(spid);
+      s = formatSplitSrc(s);
+
+      String id = s + "|" + o + "|" + l;
+
+      fangLOG.info("!!!updateSplits: " + id + "|" + locstr);
+    }
+    //fang end
+
+
     try {
+
+      fangLOG.info("fang--------------FileInputFormat->getsplits()->MajorClient.updateSplits");
+
       MajorClient.updateSplits(jobid, srcs, locations, offsets, lengths);
+
+
     } catch (TTransportException e) {
       e.printStackTrace();
     } catch (TException e) {
@@ -784,5 +819,13 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
     void addLeaf(NodeInfo nodeInfo) {
       leaves.add(nodeInfo);
     }
+  }
+
+  //fang add
+  public String formatSplitSrc (String src) {
+    if (src.indexOf("/user") != -1) {
+      src = src.substring(src.indexOf("/user"));
+    }
+    return src;
   }
 }

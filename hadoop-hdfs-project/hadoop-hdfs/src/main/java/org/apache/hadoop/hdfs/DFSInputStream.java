@@ -74,6 +74,10 @@ import org.apache.hadoop.util.IdentityHashStore;
 
 import com.google.common.annotations.VisibleForTesting;
 
+import com.google.common.collect.Lists;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 /****************************************************************
  * DFSInputStream provides bytes from a named file.  It handles 
  * negotiation of the namenode and various datanodes as necessary.
@@ -100,6 +104,7 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
   private final ReadStatistics readStatistics = new ReadStatistics();
   private String localHostname;
 
+  public static final Log fangLOG = LogFactory.getLog("fang");
   /**
    * Track the ByteBuffers that we have handed out to readers.
    * 
@@ -562,7 +567,9 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
       long offsetIntoBlock = target - targetBlock.getStartOffset();
 
       DNAddrPair retval = chooseDataNode(targetBlock, null);
-      DFSClient.LOG2.info("@@@@@@@ blockSeekTo:" + targetBlock.getBlock().getBlockName());
+      DFSClient.LOG.info("@@@@@@@ blockSeekTo:" + targetBlock.getBlock().getBlockName());
+
+      DFSClient.fangLOG.info("@@@@@@@ blockSeekTo:" + targetBlock.getBlock().getBlockName());
 
       chosenNode = retval.info;
       InetSocketAddress targetAddr = retval.addr;
@@ -814,6 +821,21 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead,
             if (pos == endoffset) {
               if (!localHostname.equals(currentNode.getHostName())) {
                 if (!src.endsWith(".jar") && !src.endsWith(".xml") && !src.endsWith(".splitmetainfo") && !src.endsWith(".split")) {
+
+                  //
+
+                  DFSClient.fangLOG.info("DFSInputStream->readWithStrategy()->MajorClient->blockLoadCompleted");
+                  DFSClient.fangLOG.info("!!!!! Block " + targetBlock1.getBlock().getBlockName() + " 传输完成！"+ " from: " + currentNode.getHostName() + " to:" + localHostname);
+
+                  fangLOG.info("DFSInputStream->readWithStrategy()->MajorClient->blockLoadCompleted");
+                  fangLOG.info("!!!!! Block " + targetBlock1.getBlock().getBlockName() + " 传输完成！"+ " from: " + currentNode.getHostName() + " to:" + localHostname);
+
+//                  DFSClient.LOG.info("DFSInputStream->readWithStrategy()->MajorClient->blockLoadCompleted");
+//                  DFSClient.LOG.info("!!!!! Block " + targetBlock1.getBlock().getBlockName() + " 传输完成！"+ " from: " + currentNode.getHostName() + " to:" + localHostname);
+//
+//                  DFSClient.LOG2.info("DFSInputStream->readWithStrategy()->MajorClient->blockLoadCompleted");
+//                  DFSClient.LOG2.info("!!!!! Block " + targetBlock1.getBlock().getBlockName() + " 传输完成！"+ " from: " + currentNode.getHostName() + " to:" + localHostname);
+
                   MajorClient.blockLoadCompleted(targetBlock1.getBlock().getBlockName(), localHostname, currentNode.getHostName());
                 }
               }

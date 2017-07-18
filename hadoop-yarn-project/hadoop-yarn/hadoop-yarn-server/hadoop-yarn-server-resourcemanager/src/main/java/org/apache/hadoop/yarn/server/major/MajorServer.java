@@ -430,6 +430,7 @@ public class MajorServer {
         return instance.applicationStartDefaultAllocate.get(appid);
     }
 
+    //FIFO中调用，包含抢占
     public int getAllocatedContainerNumber(String nodeid, String appid, int requestCapability, int newMemory, int assignableContainers) {
         int avaliableContainers = newMemory / requestCapability;
         String nid = formatNodeId(nodeid);
@@ -877,7 +878,10 @@ public class MajorServer {
             isStart = false;
         }
 
+        //-------------------------------------------------------------------------
+       //自写函数
         public void allocateRestTask() {
+            LOG.info("!!!!!!!!进入尾部调用---------");
             //本方法用于处理尾部剩余Task
             HashMap<String, HashSet<String>> nodeRestTaskMap = new HashMap<String, HashSet<String>>();
             HashMap<String, HashSet<String>> nodeTaskMap = new HashMap<String, HashSet<String>>();
@@ -919,6 +923,10 @@ public class MajorServer {
                 nodeNowContainer.put(node.nodeId, 0);
                 LOG.info("!!!!! Node " + node.nodeId + " totalResource = " + totalcontainer);
             }
+
+            //-----------------------------------------------------------------------
+            LOG.info("!!!!!ALL Node  totalResource = " + totalNodeContainer);
+            //---------------------------------------------------------------------------------------------
             avgTask = Math.max(instance.applicationUnassignedTaskPool.get(appid).size() / instance.nodeMap.keySet().size(), 1);
             for (Task task : instance.applicationUnassignedTaskPool.get(appid)) {
                 taskMap.put(task.no, task);
@@ -1271,12 +1279,13 @@ public class MajorServer {
             String str = "";
             for (Node node : nodeMap.values()) {
                 int nowc = nodeNowContainer.get(node.nodeId);
-                str += node.nodeId + "|" + nowc;
+                str += node.nodeId + "|" + nowc+"--";
             }
             LOG.info("!!!! 尾部分布: " + str);
         }
 
 
+//-------------------------------------------------------------
         @Override
         public void run() {
             isStart = true;
@@ -1293,6 +1302,7 @@ public class MajorServer {
                 int assignedTask = 0;
                 int totalNodeContainer = 0; //所有node最大容量之和
                 LOG.info("!!!! Application " + appid + " 开始分配");
+                //笔记1.统计未分配的任务task
                 if (instance.applicationUnassignedTaskPool.containsKey(appid)) {
                     if (instance.applicationUnassignedTaskPool.get(appid).size() != 0) {
                         for (Task task : instance.applicationUnassignedTaskPool.get(appid)) {
@@ -1311,6 +1321,8 @@ public class MajorServer {
                     //error?
                     return;
                 }
+
+                //笔记2.统计所有节点的情况以及拥有的container数量
                 for (Node node : instance.nodeMap.values()) {
                     nodeTaskMap.put(node.nodeId, new HashSet<String>());
                     nodeRestTaskMap.put(node.nodeId, new HashSet<String>());
@@ -1325,6 +1337,8 @@ public class MajorServer {
                     allocateRestTask();
                     break;
                 }
+
+                //笔记3.各个节点统计需求它的task
                 for (Task task : instance.applicationUnassignedTaskPool.get(appid)) {
                     taskMap.put(task.no, task);
                     for (String nodeid : task.locations) {
@@ -1337,6 +1351,8 @@ public class MajorServer {
                     }
                 }
                 LOG.info("!!!!! TaskPool: " + instance.applicationUnassignedTaskPool.get(appid).size());
+
+                //笔记4.统计节点评估值任务评估值
                 //update Z
                 for (Map.Entry<String, HashSet<String>> entry : nodeTaskMap.entrySet()) {
                     String nodeid = entry.getKey();
@@ -1357,7 +1373,8 @@ public class MajorServer {
                     taskZ.put(task.no, Z);
                 }
 
-                HashSet<String> allocatedNode = new HashSet<String>();
+                //笔记5.选定先要分配的节点
+                HashSet<String> allocatedNode = new HashSet<String>();//标记节点是否已经分配完成
                 for (int i = 0; i < nodeZ.keySet().size(); i++) {
                     //find node
                     String finalNode = null;
@@ -1365,21 +1382,21 @@ public class MajorServer {
                     boolean hasSpareNode = false;   //sparenode 定义为Z值<=1的node，用于划分Z<=1和Z>1的情况
                     for (Map.Entry<String, Double> entry : nodeZ.entrySet()) {
                         if (allocatedNode.contains(entry.getKey())) continue;
-                        if (hasSpareNode) {
-                            if (entry.getValue() < finalZ) {
+                        if (hasSpareNode) {//存在空闲节点
+                            if (entry.getValue() < finalZ) {//当前找到的节点评估值比刚才暂存的还要小改变final节点
                                 finalNode = entry.getKey();
                                 finalZ = entry.getValue();
                             }
-                        } else {
-                            if (entry.getValue() <= 1) {
+                        } else {//还未找到空闲节点
+                            if (entry.getValue() <= 1) {//节点评估值小于等于1，任务可以放进
                                 hasSpareNode = true;
                                 finalNode = entry.getKey();
                                 finalZ = entry.getValue();
-                            } else {
-                                if (finalNode == null) {
+                            } else {//节点评估值大于1，任务不能完全放入
+                                if (finalNode == null) {//选定的node
                                     finalNode = entry.getKey();
                                     finalZ = entry.getValue();
-                                } else {
+                                } else {//存在选定的节点，那么就选取节点品估值最大的
                                     if (entry.getValue() > finalZ) {
                                         finalZ = entry.getValue();
                                         finalNode = entry.getKey();
@@ -1392,7 +1409,7 @@ public class MajorServer {
                     if (finalNode != null) {
                         LOG.info("!!!!! finalNode: " + finalNode + " hasSpareNode = " + hasSpareNode);
                         allocatedNode.add(finalNode);
-                        if (hasSpareNode) {
+                        if (hasSpareNode) {//有满足节点评估值小于1的情况
                             //nodeZ <= 1
                             LOG.info("!!!!!!hasSpareNode:" + nodeTaskMap.get(finalNode).size());
                             HashSet<String> toRemoveTask = new HashSet<String>();   //用于事先去除SplitChain的Task
@@ -1419,9 +1436,9 @@ public class MajorServer {
                                 assignedTask++;
                             }
                             for (String s : toRemoveTask) {
-                                nodeTaskMap.get(finalNode).remove(s);
+                                nodeTaskMap.get(finalNode).remove(s);//移除掉已经分配的任务
                             }
-                        } else {
+                        } else {//无满足节点评估值小于1的情况。
                             //nodeZ > 1
                             LOG.info("!!!!!!hasNoSpareNode:" + nodeTotalContainer.get(finalNode));
                             for (int j = 0; j < nodeTotalContainer.get(finalNode); j++) {
@@ -1496,7 +1513,7 @@ public class MajorServer {
                                 }
                             }
                         }
-                    } else {
+                    } else {//找不到选定节点
                         LOG.info("!!!!! finalNode: not found!");
                     }
                     //update Z
@@ -1520,6 +1537,7 @@ public class MajorServer {
                     }
                 }
                 LOG.info("!!!!!!贪心共分配了 " + assignedTask + " 个任务");
+                //部分2
                 //part 2
                 int restTask = instance.applicationUnassignedTaskPool.get(appid).size();
                 if (restTask == 0) {
@@ -1527,6 +1545,7 @@ public class MajorServer {
                     return;
                 }
                 LOG.info("!!!!!!!贪心未分配完任务，剩余 " + restTask + " 个任务");
+                //统计container是否有剩余
                 HashSet<Node> spareNode = new HashSet<Node>();
                 int spareContainer = 0;
                 for (Map.Entry<String, HashSet<String>> entry : nodeTaskMap.entrySet()) {
@@ -1822,11 +1841,11 @@ public class MajorServer {
         if (node == null) {
             //非集群主机的传输
             nodeMap.get(src).totalTransports--;
-            LOG.info("!!!!! Block " + blokid + " 传输完成！");
+            LOG.info("!!!!! Block " + blokid + " 传输完成！"+ " from: " + src + " to" + nodeid);
             return;
         }
         if (node.transportingBlock.containsKey(blokid)) {
-            LOG.info("!!!!! Block " + blokid + " 传输完成！");
+            LOG.info("!!!!! Block " + blokid + " 传输完成！"+ " from: " + src + " to" + nodeid);
             Transport ts = node.transportingBlock.get(blokid);
             node.totalTransports--;
             if (!ts.srcNode.equals(src)) {
@@ -1882,6 +1901,7 @@ public class MajorServer {
         return newmap;
     }
 
+    //统计block情况，初始位置加偏移量
     public void updateSplits(String appid, Map<String,String> src, Map<String,List<String>> locations, Map<String,Long> offset, Map<String,Long> length) {
         appid = formatAppId(appid);
         if (!instance.applicationSplitMap.containsKey(appid)) {
